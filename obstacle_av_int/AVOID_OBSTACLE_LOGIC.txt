@@ -1,0 +1,84 @@
+STATE = { FORWARD, AVOID_OBSTACLE, RECOVERY }
+
+
+
+INITIALIZE:
+    state = FORWARD
+    turnTimestamps = empty queue
+
+LOOP FOREVER:
+
+    distance = READ_DISTANCE()
+    currentTime = GET_TIME()
+
+    SWITCH state:
+
+        // ----------------------
+        CASE FORWARD:
+        // ----------------------
+        IF distance >= DIST_THRESHOLD THEN
+            MOVE_FORWARD()
+        ELSE
+            state = AVOID_OBSTACLE
+        ENDIF
+
+
+        // ----------------------
+        CASE AVOID_OBSTACLE:
+        // ----------------------
+        STOP_MOTORS()
+
+        MOVE_BACKWARD()
+        WAIT(REVERSE_TIME)
+
+        TURN(SELECT_TURN_DIRECTION())
+        WAIT(TURN_TIME)
+
+        STOP_MOTORS()
+
+        // ---- RECORD TURN EVENT ----
+        ENQUEUE(turnTimestamps, currentTime)
+
+        // ---- REMOVE OLD EVENTS (older than 10 sec) ----
+        WHILE turnTimestamps NOT EMPTY AND
+              (currentTime - FRONT(turnTimestamps)) > WINDOW_TIME:
+              DEQUEUE(turnTimestamps)
+        ENDWHILE
+
+        // ---- CHECK STUCK CONDITION ----
+        IF SIZE(turnTimestamps) > MAX_TURNS_WINDOW THEN
+            state = RECOVERY
+        ELSE
+            state = FORWARD
+        ENDIF
+
+
+        // ----------------------
+        CASE RECOVERY:
+        // ----------------------
+        PRINT "RECOVERY MODE"
+
+        STOP_MOTORS()
+
+        // More aggressive escape behavior
+        MOVE_BACKWARD()
+        WAIT(2 * REVERSE_TIME)
+
+        TURN(LEFT)
+        WAIT(2 * TURN_TIME)
+
+        MOVE_FORWARD()
+        WAIT(1000 ms)
+
+        STOP_MOTORS()
+
+        // Reset detection system
+        CLEAR(turnTimestamps)
+
+        state = FORWARD
+
+    END SWITCH
+
+    WAIT(LOOP_DELAY)
+
+END LOOP

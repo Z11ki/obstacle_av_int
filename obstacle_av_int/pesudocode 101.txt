@@ -1,0 +1,124 @@
+BEGIN
+
+
+// CONSTANTS (modifiable)
+
+SET DIST_THRESHOLD = 20 cm
+SET REVERSE_TIME = 1000 ms
+SET TURN_TIME = 700 ms
+SET LOOP_DELAY = 50 ms
+SET MAX_TURNS_WINDOW = 5
+SET WINDOW_TIME = 10000 ms
+
+
+// VARIABLES
+
+DECLARE distance
+DECLARE currentTime
+DECLARE turnCount = 0
+DECLARE turnTimestamps as queue
+
+
+// INITIALIZATION
+
+INITIALIZE ultrasonic sensor
+INITIALIZE motor driver pins
+INITIALIZE serial communication
+INITIALIZE LEDs / buzzer (optional)
+
+
+// MAIN LOOP
+
+LOOP FOREVER:
+
+    distance = READ_DISTANCE()
+
+    PRINT "Distance:", distance
+
+    IF distance < DIST_THRESHOLD THEN
+        
+        PRINT "Obstacle detected"
+
+        STOP_MOTORS()
+
+        MOVE_BACKWARD()
+        WAIT(REVERSE_TIME)
+        STOP_MOTORS()
+
+        TURN_DIRECTION = SELECT_TURN_DIRECTION()
+        TURN(TURN_DIRECTION)
+        WAIT(TURN_TIME)
+        STOP_MOTORS()
+
+        // ---- Stuck Detection Logic ----
+        currentTime = GET_TIME()
+        ADD currentTime TO turnTimestamps
+        REMOVE timestamps older than WINDOW_TIME
+
+        turnCount = SIZE(turnTimestamps)
+
+        IF turnCount > MAX_TURNS_WINDOW THEN
+            PRINT "Stuck detected"
+            RECOVERY_BEHAVIOR()
+            CLEAR turnTimestamps
+        ENDIF
+
+    ELSE
+        PRINT "Path clear"
+        MOVE_FORWARD()
+    ENDIF
+
+    WAIT(LOOP_DELAY)
+
+END LOOP
+
+
+// FUNCTIONS
+
+
+FUNCTION READ_DISTANCE():
+    TRIGGER ultrasonic pulse
+    MEASURE echo time
+    COMPUTE distance
+    RETURN distance
+END FUNCTION
+
+FUNCTION MOVE_FORWARD():
+    SET motors forward
+END FUNCTION
+
+FUNCTION MOVE_BACKWARD():
+    SET motors backward
+END FUNCTION
+
+FUNCTION TURN(direction):
+    IF direction == LEFT:
+        LEFT motor backward, RIGHT motor forward
+    ELSE:
+        LEFT motor forward, RIGHT motor backward
+    ENDIF
+END FUNCTION
+
+FUNCTION STOP_MOTORS():
+    DISABLE both motors
+END FUNCTION
+
+FUNCTION SELECT_TURN_DIRECTION():
+    // Option 1: random
+    RETURN RANDOM(LEFT, RIGHT)
+
+    // Option 2 (better): compare left/right distance if you add more sensing
+END FUNCTION
+
+FUNCTION RECOVERY_BEHAVIOR():
+    STOP_MOTORS()
+    MOVE_BACKWARD()
+    WAIT(2 * REVERSE_TIME)
+
+    TURN(LEFT)
+    WAIT(2 * TURN_TIME)
+
+    STOP_MOTORS()
+END FUNCTION
+
+END
